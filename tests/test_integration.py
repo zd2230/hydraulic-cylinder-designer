@@ -55,24 +55,26 @@ def test_full_pipeline():
     assert wall > 0 and Do > Ds, f"Step 5 failed: wall={wall}"
     assert wtr > 0, f"Wall ratio must be positive, got {wtr}"
 
-    # Step 6: Buckling stability
+    # Step 6: Buckling stability (all units in mm, consistent with app.py fix)
     mt = 200; mu = 1.0; nr = 10
     L = S + mt
-    I = inertia_moment(ds / 1000)
-    Ar = math.pi * (ds / 1000)**2 / 4
-    i_r = math.sqrt(I / Ar) if Ar > 0 else 0
-    lam = mu * (L / 1000) / i_r if i_r > 0 else 0
+    ds_mm = ds
+    I_mm4 = math.pi * ds_mm**4 / 64
+    Ar_mm2 = math.pi * ds_mm**2 / 4
+    i_mm = math.sqrt(I_mm4 / Ar_mm2) if Ar_mm2 > 0 else 0
+    Le_mm = mu * L
+    lam = Le_mm / i_mm if i_mm > 0 else 0
     sp = st['σp']; a_st = st['a']; b_st = st['b']; E = st['E']
     l1 = math.pi * math.sqrt(E / sp) if sp > 0 else 100
     l2 = (a_st - sp) / b_st if b_st > 0 else 60
 
     if lam >= l1:
-        Pcr = math.pi**2 * E * I / (mu * L / 1000)**2 / 1000
+        Pcr = math.pi**2 * E * I_mm4 / Le_mm**2 / 1000
     elif lam >= l2:
         sc = a_st - b_st * lam
-        Pcr = sc * Ar / 1000
+        Pcr = sc * Ar_mm2 / 1000
     else:
-        Pcr = st['σs'] * Ar * 1e6 / 1000  # MPa * m2 -> N -> kN
+        Pcr = st['σs'] * Ar_mm2 / 1000  # MPa * m2 -> N -> kN
 
     nse = Pcr / (F / 1000) if F > 0 else 0
     passed = nse >= nr

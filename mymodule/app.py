@@ -6,6 +6,7 @@
 
 V2.3 修复(2026-06-03):
 - [致命] 蓄能器公式从 p1/p0-p2/p0 修正为标准等温/绝热公式,使用绝对压力
+- [致命] 稳定性校核三公式(欧拉/Tetmajer/屈服)统一使用mm单位制,修复m²·N/mm²混用
 - [高] 壁厚分类从 p/D 比值改为实际 δ/D 比值判断薄壁/厚壁
 - [中] 移除压杆稳定性非标准 L/d>15 惩罚因子
 - [中] 恢复项目时异常不再静默吞没
@@ -708,13 +709,27 @@ def c6(app):
     if mat not in STEEL_DB: mat="45#"
     mu=app.s6_mu.getf(1.0);mt=app.s6_ma.getf(200);nr=app.s6_nr.getf(10)
     st=STEEL_DB[mat];L=S+mt
-    I=inertia_moment(ds/1000);Ar=math.pi*(ds/1000)**2/4
-    i=math.sqrt(I/Ar) if Ar>0 else 0;lam=mu*(L/1000)/i if i>0 else 0
-    sp=st.get("σp",300);l1=math.pi*math.sqrt(st["E"]/sp) if sp>0 else 100
-    l2=(st["a"]-sp)/st["b"] if st["b"]>0 else 60
-    if lam>=l1: Pcr=math.pi**2*st["E"]*I/(mu*L/1000)**2/1000;tp=f"大柔度λ≥{l1:.0f}→欧拉"
-    elif lam>=l2: sc=st["a"]-st["b"]*lam;Pcr=sc*Ar/1000;tp=f"中柔度{l2:.0f}≤λ<{l1:.0f}"
-    else: Pcr=st["σs"]*Ar/1000;tp=f"小柔度λ<{l2:.0f}→屈服"
+    # 统一使用 mm 单位体系:
+    # E 在 STEEL_DB 中为 MPa (= N/mm²), ds 转换为 mm, L 已是 mm
+    ds_mm = ds  # ds 本来就是 mm
+    I_mm4 = math.pi * ds_mm**4 / 64
+    Ar_mm2 = math.pi * ds_mm**2 / 4
+    i_mm = math.sqrt(I_mm4 / Ar_mm2) if Ar_mm2 > 0 else 0
+    Le_mm = mu * L
+    lam = Le_mm / i_mm if i_mm > 0 else 0
+    sp = st.get("σp", 300)
+    l1 = math.pi * math.sqrt(st["E"] / sp) if sp > 0 else 100
+    l2 = (st["a"] - sp) / st["b"] if st["b"] > 0 else 60
+    if lam >= l1:
+        Pcr = math.pi**2 * st["E"] * I_mm4 / Le_mm**2 / 1000
+        tp = f"大柔度λ≥{l1:.0f}→欧拉"
+    elif lam >= l2:
+        sc = st["a"] - st["b"] * lam
+        Pcr = sc * Ar_mm2 / 1000
+        tp = f"中柔度{l2:.0f}≤λ<{l1:.0f}"
+    else:
+        Pcr = st["σs"] * Ar_mm2 / 1000
+        tp = f"小柔度λ<{l2:.0f}→屈服"
     nse=Pcr/(F/1000) if F>0 else 0
     # 注意: 柔度 λ 已经通过 Euler/Tetmajer 公式完整捕捉了长细比效应
     # 不再叠加非标准的 L/d 惩罚因子
