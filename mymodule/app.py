@@ -747,7 +747,9 @@ def c6(app):
         txt=f"⚠ n_st={nse:.2f} < [{nr}]，安全余量不足。建议将活塞杆直径增大至约{need_d:.0f}mm，或减小安装行程"
     else:
         col,bg=C_RED,"#fde8e8"
-        need_d=((nr/max(nse,0.01)*I*64/math.pi)**0.25)*1000
+        # need_d 基于稳定性需求反推: n_st_req = Pcr_new / (F/1000)
+        # 假设增大杆径后仍落在此 regime，用 yield 公式估算: n_st ∝ d²→d⁴
+        need_d=((nr/max(nse,0.01))*ds_mm**4)**0.25
         if need_d<Ds*0.95:
             txt=f"✗ 不通过！n_st={nse:.2f} << [{nr}]，失稳风险高。建议方案：\n①增大杆径至≥{need_d:.0f}mm\n②加中间支撑套缩短有效压杆长度\n③改用两端固定安装(μ=0.5)"
         else:
